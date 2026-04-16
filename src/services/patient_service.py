@@ -8,9 +8,10 @@ import aiofiles
 from fastapi import BackgroundTasks, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.models.domain import PatientResponse
+from src.models.domain import PatientDetail, PatientSummary
 from src.notifiers.base import BaseNotifier
 from src.repositories.patient_repository import PatientRepository
+from src.services.encryption_service import EncryptionService
 from src.validators.email_validator import EmailValidator
 from src.validators.name_validator import NameValidator
 from src.validators.phone_validator import PhoneValidator
@@ -28,6 +29,7 @@ class PatientService:  # pylint: disable=too-many-instance-attributes
         self,
         repo: PatientRepository,
         notifiers: list[BaseNotifier],
+        encryption_service: EncryptionService | None = None,
         name_validator: NameValidator | None = None,
         email_validator: EmailValidator | None = None,
         phone_validator: PhoneValidator | None = None,
@@ -35,6 +37,7 @@ class PatientService:  # pylint: disable=too-many-instance-attributes
     ):
         self.repo = repo
         self.notifiers = notifiers
+        self.encryption_service = encryption_service or EncryptionService()
         self.name_validator = name_validator or NameValidator()
         self.email_validator = email_validator or EmailValidator()
         self.phone_validator = phone_validator or PhoneValidator()
@@ -48,7 +51,7 @@ class PatientService:  # pylint: disable=too-many-instance-attributes
         phone: str,
         file: UploadFile,
         background_tasks: BackgroundTasks,
-    ) -> PatientResponse:
+    ) -> PatientDetail:
         """Validate, persist, and notify for a new patient registration."""
         logger.info("Validating name for new patient: %s", name)
         self.name_validator.validate(name)
@@ -63,7 +66,7 @@ class PatientService:  # pylint: disable=too-many-instance-attributes
         self.photo_validator.validate(file)
 
         logger.info("Saving document photo for patient: %s", email)
-        file_path = await self._save_upload(file)
+        file_path = await self._save_upload(file, self.encryption_service)
 
         logger.info("Creating patient record in DB: %s", email)
         patient = await self.repo.create(
@@ -76,7 +79,7 @@ class PatientService:  # pylint: disable=too-many-instance-attributes
             },
         )
 
-        response = PatientResponse.model_validate(patient)
+        response = PatientDetail.model_validate(patient)
         logger.info("Patient registered successfully: id=%s email=%s", response.id, response.email)
 
         for notifier in self.notifiers:
@@ -84,14 +87,14 @@ class PatientService:  # pylint: disable=too-many-instance-attributes
 
         return response
 
-    async def get_all(self, session: AsyncSession) -> list[PatientResponse]:
+    async def get_all(self, session: AsyncSession) -> list[PatientSummary]:
         """Return all patients ordered by registration date."""
         logger.info("Fetching all patients from DB")
         patients = await self.repo.get_all(session)
         logger.info("Fetched %d patient(s)", len(patients))
-        return [PatientResponse.model_validate(p) for p in patients]
+        return [PatientSummary.model_validate(p) for p in patients]
 
-    async def get_by_id(self, session: AsyncSession, patient_id: uuid.UUID) -> PatientResponse:
+    async def get_by_id(self, session: AsyncSession, patient_id: uuid.UUID) -> PatientDetail:
         """Return a single patient by UUID, or raise 404 if not found."""
         logger.info("Fetching patient from DB: id=%s", patient_id)
         patient = await self.repo.get_by_id(session, patient_id)
@@ -101,15 +104,23 @@ class PatientService:  # pylint: disable=too-many-instance-attributes
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Patient not found.",
             )
-        return PatientResponse.model_validate(patient)
+        return PatientDetail.model_validate(patient)
 
     @staticmethod
-    async def _save_upload(file: UploadFile) -> Path:
+    async def _save_upload(file: UploadFile, encryption_service: EncryptionService) -> Path:
         UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
         suffix = Path(file.filename or "").suffix
         filename = f"{uuid.uuid4().hex}{suffix}"
         file_path = UPLOAD_DIR / filename
+
+        chunks: list[bytes] = []
+        while chunk := await file.read(1024 * 1024):
+            chunks.append(chunk)
+        plaintext = b"".join(chunks)
+
+        encrypted = encryption_service.encrypt(plaintext)
+
         async with aiofiles.open(file_path, "wb") as out:
-            while chunk := await file.read(1024 * 1024):
-                await out.write(chunk)
+            await out.write(encrypted)
+
         return file_path

@@ -1,17 +1,18 @@
-"""HTTP routes for patient registration and retrieval."""
+"""FastAPI router for patient registration and retrieval endpoints."""
 
 import logging
 import uuid
 from dataclasses import dataclass
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, Request, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.dependencies import get_notifiers, get_session
+from src.models.domain import PatientDetail, PatientSummary
 from src.notifiers.base import BaseNotifier
+from src.repositories.audit_repository import AuditRepository
 from src.repositories.patient_repository import PatientRepository
 from src.services.patient_service import PatientService
-from src.models.domain import PatientResponse
 
 logger = logging.getLogger(__name__)
 
@@ -50,17 +51,18 @@ def get_patient_service(
     return PatientService(repo=PatientRepository(), notifiers=notifiers)
 
 
-@router.post("", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PatientDetail, status_code=status.HTTP_201_CREATED)
 async def create_patient(
+    request: Request,
     background_tasks: BackgroundTasks,
     payload: PatientCreatePayload = Depends(get_patient_create_payload),
     session: AsyncSession = Depends(get_session),
     service: PatientService = Depends(get_patient_service),
-) -> PatientResponse:
-    """Register a new patient and schedule notifications."""
+) -> PatientDetail:
+    """Register a new patient and return the full patient record."""
     logger.info("POST /patients - registering patient with email=%s", payload.email)
 
-    return await service.register(
+    result = await service.register(
         session,
         name=payload.name,
         email=payload.email,
@@ -69,23 +71,56 @@ async def create_patient(
         background_tasks=background_tasks,
     )
 
+    audit_repo = AuditRepository()
+    await audit_repo.create(
+        session,
+        action="CREATE",
+        resource_id=result.id,
+        ip_address=request.client.host if request.client else "unknown",
+    )
 
-@router.get("", response_model=list[PatientResponse])
+    return result
+
+
+@router.get("", response_model=list[PatientSummary])
 async def list_patients(
+    request: Request,
     session: AsyncSession = Depends(get_session),
     service: PatientService = Depends(get_patient_service),
-) -> list[PatientResponse]:
-    """Return all registered patients."""
+) -> list[PatientSummary]:
+    """Return a summary list of all patients (no phone or document_photo)."""
     logger.info("GET /patients - fetching all patients")
-    return await service.get_all(session)
+    results = await service.get_all(session)
+
+    audit_repo = AuditRepository()
+    for patient in results:
+        await audit_repo.create(
+            session,
+            action="READ",
+            resource_id=patient.id,
+            ip_address=request.client.host if request.client else "unknown",
+        )
+
+    return results
 
 
-@router.get("/{patient_id}", response_model=PatientResponse)
+@router.get("/{patient_id}", response_model=PatientDetail)
 async def get_patient(
     patient_id: uuid.UUID,
+    request: Request,
     session: AsyncSession = Depends(get_session),
     service: PatientService = Depends(get_patient_service),
-) -> PatientResponse:
-    """Return a single patient by UUID."""
+) -> PatientDetail:
+    """Return the full detail record for a single patient."""
     logger.info("GET /patients/%s - fetching patient", patient_id)
-    return await service.get_by_id(session, patient_id=patient_id)
+    result = await service.get_by_id(session, patient_id=patient_id)
+
+    audit_repo = AuditRepository()
+    await audit_repo.create(
+        session,
+        action="READ",
+        resource_id=result.id,
+        ip_address=request.client.host if request.client else "unknown",
+    )
+
+    return result

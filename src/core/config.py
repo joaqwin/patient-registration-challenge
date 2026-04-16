@@ -22,5 +22,7 @@ class Settings(BaseSettings):
     MAILTRAP_USER: str
     MAILTRAP_PASS: str
 
+    ENCRYPTION_KEY: str
+
 
 settings = Settings()

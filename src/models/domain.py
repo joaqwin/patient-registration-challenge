@@ -14,8 +14,19 @@ class PatientCreate(BaseModel):
     phone: str
 
 
-class PatientResponse(BaseModel):
-    """API response schema for a patient record."""
+class PatientSummary(BaseModel):
+    """Minimal API response schema for patient list — omits sensitive fields."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: uuid.UUID
+    name: str
+    email: EmailStr
+    created_at: datetime
+
+
+class PatientDetail(BaseModel):
+    """Full API response schema for a single patient record — includes all fields."""
 
     model_config = ConfigDict(from_attributes=True)
 
