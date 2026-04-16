@@ -1,6 +1,7 @@
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
+from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.dependencies import get_notifiers, get_session
@@ -28,7 +29,10 @@ async def create_patient(
     session: AsyncSession = Depends(get_session),
     service: PatientService = Depends(get_patient_service),
 ) -> PatientResponse:
-    payload = PatientCreate(name=name, email=email, phone=phone)
+    try:
+        payload = PatientCreate(name=name, email=email, phone=phone)
+    except ValidationError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
     return await service.register(
         session,
         name=payload.name,
