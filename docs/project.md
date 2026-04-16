@@ -13,6 +13,7 @@
 9. [Email — Mailtrap Sandbox](#email--mailtrap-sandbox)
 10. [Tests](#tests)
 11. [Scalability Considerations](#scalability-considerations)
+12. [HIPAA Compliance](#hipaa-compliance)
 
 ---
 
@@ -412,3 +413,35 @@ etc.) so the web workers are not blocked and failed notifications can be retried
 All secrets and environment-specific values are already in `.env` / `pydantic-settings`, so
 migrating to a secrets manager (AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault) only
 requires changing where the `.env` values come from — no code changes needed.
+
+---
+
+## HIPAA Compliance
+
+This API handles Protected Health Information (PHI): patient names, email addresses, phone
+numbers, and document photos. As such, it is subject to HIPAA's Technical Safeguard requirements,
+which mandate controls over how PHI is accessed, transmitted, and stored.
+
+Five technical safeguards were identified and implemented on a separate branch:
+
+1. **Encryption at rest** — document photos are encrypted with Fernet (symmetric encryption from
+   the `cryptography` library) before being written to disk, so raw files are never stored in
+   plaintext.
+2. **Encryption in transit** — all traffic should be routed through an nginx reverse proxy
+   configured with TLS, ensuring PHI is never sent over an unencrypted connection.
+3. **Audit logging** — every PHI access (POST and GET requests) is recorded in an `audit_logs`
+   database table, capturing the action, resource ID, IP address, and timestamp.
+4. **Data minimization** — response schemas are scoped by endpoint: `PatientSummary` (name and
+   email only) for `GET /patients`, and `PatientDetail` (full record) for `GET /patients/{id}`,
+   limiting exposure of sensitive fields.
+5. **Secret management** — the `ENCRYPTION_KEY` is managed as an environment variable via
+   `pydantic-settings`, keeping cryptographic material out of the codebase.
+
+These changes are implemented on the `feature/hipaa-compliance` branch. Due to time constraints,
+the branch has not been fully tested and **should not be merged to main** until proper test
+coverage is in place.
+
+Before merging, the following should be verified: that files are correctly encrypted on upload
+and can be decrypted on retrieval, that an audit log entry is written for every PHI request, and
+that all existing integration tests continue to pass with the new schema split and the
+`ENCRYPTION_KEY` variable present in the test environment.
