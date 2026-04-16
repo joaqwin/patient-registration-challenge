@@ -8,14 +8,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from src.models.domain import PatientResponse
 from src.notifiers.base import BaseNotifier
 from src.repositories.patient_repository import PatientRepository
+from src.validators.email_validator import EmailValidator
+from src.validators.phone_validator import PhoneValidator
 
 UPLOAD_DIR = Path("uploads")
 
 
 class PatientService:
-    def __init__(self, repo: PatientRepository, notifiers: list[BaseNotifier]):
+    def __init__(
+        self,
+        repo: PatientRepository,
+        notifiers: list[BaseNotifier],
+        email_validator: EmailValidator | None = None,
+        phone_validator: PhoneValidator | None = None,
+    ):
         self.repo = repo
         self.notifiers = notifiers
+        self.email_validator = email_validator or EmailValidator()
+        self.phone_validator = phone_validator or PhoneValidator()
 
     async def register(
         self,
@@ -26,12 +36,8 @@ class PatientService:
         file: UploadFile,
         background_tasks: BackgroundTasks,
     ) -> PatientResponse:
-        existing = await self.repo.get_by_email(session, email)
-        if existing is not None:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="A patient with this email already exists",
-            )
+        await self.email_validator.validate(email, session, self.repo)
+        await self.phone_validator.validate(phone, session, self.repo)
 
         file_path = await self._save_upload(file)
 
@@ -61,7 +67,7 @@ class PatientService:
         if patient is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Patient not found",
+                detail="Patient not found.",
             )
         return PatientResponse.model_validate(patient)
 

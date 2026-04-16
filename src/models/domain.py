@@ -1,23 +1,15 @@
-import re
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
-
-E164_PHONE = re.compile(r"^\+[1-9]\d{1,14}$")
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class PatientCreate(BaseModel):
-    name: str = Field(..., min_length=2)
-    email: EmailStr
-    phone: str
+    """Input schema. Format and uniqueness validation is handled by the validator classes."""
 
-    @field_validator("phone")
-    @classmethod
-    def _validate_phone(cls, v: str) -> str:
-        if not E164_PHONE.match(v):
-            raise ValueError("phone must be in E.164 format, e.g. +14155552671")
-        return v
+    name: str = Field(..., min_length=2)
+    email: str
+    phone: str
 
 
 class PatientResponse(BaseModel):

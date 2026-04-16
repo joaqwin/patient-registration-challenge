@@ -22,7 +22,7 @@ def get_patient_service(
 @router.post("", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
 async def create_patient(
     background_tasks: BackgroundTasks,
-    name: str = Form(..., min_length=2),
+    name: str = Form(...),
     email: str = Form(...),
     phone: str = Form(...),
     document_photo: UploadFile = File(...),
@@ -33,6 +33,7 @@ async def create_patient(
         payload = PatientCreate(name=name, email=email, phone=phone)
     except ValidationError as exc:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
+
     return await service.register(
         session,
         name=payload.name,
