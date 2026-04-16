@@ -1,3 +1,4 @@
+import logging
 import re
 
 from fastapi import HTTPException, status
@@ -5,7 +6,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.repositories.patient_repository import PatientRepository
 
-# +1 followed by up to 10 digits (NANP format).
+logger = logging.getLogger(__name__)
+
+# +1 followed by exactly 10 digits (NANP format).
 _PHONE_RE = re.compile(r"^\+1\d{10}$")
 
 
@@ -29,7 +32,9 @@ class PhoneValidator:
 
     @staticmethod
     def _check_format(phone: str) -> None:
+        logger.info("Checking phone format: %s", phone)
         if not _PHONE_RE.match(phone):
+            logger.warning("Invalid phone format: %s", phone)
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail=(
@@ -45,8 +50,10 @@ class PhoneValidator:
         session: AsyncSession,
         repo: PatientRepository,
     ) -> None:
+        logger.info("Checking phone uniqueness: %s", phone)
         existing = await repo.get_by_phone(session, phone)
         if existing is not None:
+            logger.warning("Phone already registered: %s", phone)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"The phone number '{phone}' is already registered. Please use a different number.",
