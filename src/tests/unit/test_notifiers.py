@@ -1,4 +1,4 @@
-"""Unit tests for the EmailNotifier and SmsNotifier classes."""
+"""Unit tests for the EmailNotifier class."""
 
 import uuid
 from datetime import datetime, timezone
@@ -9,7 +9,6 @@ import pytest
 from src.core.config import settings
 from src.models.domain import PatientResponse
 from src.notifiers.email_notifier import EmailNotifier
-from src.notifiers.sms_notifier import SmsNotifier
 
 
 @pytest.fixture
@@ -40,15 +39,3 @@ async def test_email_notifier_calls_smtp(  # pylint: disable=redefined-outer-nam
     assert kwargs["port"] == settings.MAILTRAP_PORT
     assert kwargs["username"] == settings.MAILTRAP_USER
     assert kwargs["password"] == settings.MAILTRAP_PASS
-
-
-async def test_sms_notifier_only_logs(  # pylint: disable=redefined-outer-name
-    patient_response: PatientResponse,
-) -> None:
-    """SmsNotifier.notify should log an info message and perform no external calls."""
-    with patch("src.notifiers.sms_notifier.logger") as mock_logger:
-        await SmsNotifier().notify(patient_response)
-
-    mock_logger.info.assert_called_once_with(
-        "SMS notification not yet implemented for %s", patient_response.email
-    )
