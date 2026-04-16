@@ -39,6 +39,13 @@ def mock_notifier() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_name_validator() -> MagicMock:
+    v = MagicMock()
+    v.validate = MagicMock(return_value=None)
+    return v
+
+
+@pytest.fixture
 def mock_email_validator() -> AsyncMock:
     v = AsyncMock()
     v.validate = AsyncMock(return_value=None)
@@ -53,17 +60,28 @@ def mock_phone_validator() -> AsyncMock:
 
 
 @pytest.fixture
+def mock_photo_validator() -> MagicMock:
+    v = MagicMock()
+    v.validate = MagicMock(return_value=None)
+    return v
+
+
+@pytest.fixture
 def service(
     mock_repo: AsyncMock,
     mock_notifier: AsyncMock,
+    mock_name_validator: MagicMock,
     mock_email_validator: AsyncMock,
     mock_phone_validator: AsyncMock,
+    mock_photo_validator: MagicMock,
 ) -> PatientService:
     return PatientService(
         repo=mock_repo,
         notifiers=[mock_notifier],
+        name_validator=mock_name_validator,
         email_validator=mock_email_validator,
         phone_validator=mock_phone_validator,
+        photo_validator=mock_photo_validator,
     )
 
 
