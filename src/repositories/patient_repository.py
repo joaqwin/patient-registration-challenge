@@ -26,3 +26,7 @@ class PatientRepository:
     async def get_by_email(self, session: AsyncSession, email: str) -> Patient | None:
         result = await session.execute(select(Patient).where(Patient.email == email))
         return result.scalar_one_or_none()
+
+    async def get_by_phone(self, session: AsyncSession, phone: str) -> Patient | None:
+        result = await session.execute(select(Patient).where(Patient.phone == phone))
+        return result.scalar_one_or_none()

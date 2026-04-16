@@ -29,7 +29,6 @@ def _orm_patient(**overrides) -> MagicMock:
 @pytest.fixture
 def mock_repo() -> AsyncMock:
     repo = AsyncMock()
-    repo.get_by_email.return_value = None
     repo.create.return_value = _orm_patient()
     return repo
 
@@ -40,8 +39,32 @@ def mock_notifier() -> AsyncMock:
 
 
 @pytest.fixture
-def service(mock_repo: AsyncMock, mock_notifier: AsyncMock) -> PatientService:
-    return PatientService(repo=mock_repo, notifiers=[mock_notifier])
+def mock_email_validator() -> AsyncMock:
+    v = AsyncMock()
+    v.validate = AsyncMock(return_value=None)
+    return v
+
+
+@pytest.fixture
+def mock_phone_validator() -> AsyncMock:
+    v = AsyncMock()
+    v.validate = AsyncMock(return_value=None)
+    return v
+
+
+@pytest.fixture
+def service(
+    mock_repo: AsyncMock,
+    mock_notifier: AsyncMock,
+    mock_email_validator: AsyncMock,
+    mock_phone_validator: AsyncMock,
+) -> PatientService:
+    return PatientService(
+        repo=mock_repo,
+        notifiers=[mock_notifier],
+        email_validator=mock_email_validator,
+        phone_validator=mock_phone_validator,
+    )
 
 
 @pytest.fixture
@@ -75,15 +98,19 @@ async def test_register_success(
     assert result.name == "John Doe"
     assert result.email == "john@example.com"
     mock_repo.create.assert_awaited_once()
-    assert len(bg.tasks) == 1  # one background task queued per notifier
+    assert len(bg.tasks) == 1
 
 
 async def test_register_duplicate_email(
     service: PatientService,
     mock_repo: AsyncMock,
+    mock_email_validator: AsyncMock,
     mock_upload: MagicMock,
 ) -> None:
-    mock_repo.get_by_email.return_value = _orm_patient()
+    mock_email_validator.validate.side_effect = HTTPException(
+        status_code=409,
+        detail="The email 'john@example.com' is already registered.",
+    )
 
     with pytest.raises(HTTPException) as exc_info:
         await service.register(
@@ -95,7 +122,7 @@ async def test_register_duplicate_email(
             background_tasks=BackgroundTasks(),
         )
 
-    assert exc_info.value.status_code == 400
+    assert exc_info.value.status_code == 409
     mock_repo.create.assert_not_awaited()
 
 

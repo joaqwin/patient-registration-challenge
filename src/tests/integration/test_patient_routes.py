@@ -27,7 +27,7 @@ async def test_post_patient_duplicate_email(client: AsyncClient) -> None:
 
     response = await client.post("/patients", data=VALID_FORM, files=VALID_FILE)
 
-    assert response.status_code == 400
+    assert response.status_code == 409
 
 
 async def test_post_patient_missing_fields(client: AsyncClient) -> None:
