@@ -1,10 +1,10 @@
+"""Business logic layer for patient registration and retrieval."""
+
 import logging
 import uuid
 from pathlib import Path
 
 import aiofiles
-
-logger = logging.getLogger(__name__)
 from fastapi import BackgroundTasks, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,11 +16,15 @@ from src.validators.name_validator import NameValidator
 from src.validators.phone_validator import PhoneValidator
 from src.validators.photo_validator import PhotoValidator
 
+logger = logging.getLogger(__name__)
+
 UPLOAD_DIR = Path("uploads")
 
 
-class PatientService:
-    def __init__(
+class PatientService:  # pylint: disable=too-many-instance-attributes
+    """Orchestrates validation, persistence, and notification for patient operations."""
+
+    def __init__(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         repo: PatientRepository,
         notifiers: list[BaseNotifier],
@@ -36,7 +40,7 @@ class PatientService:
         self.phone_validator = phone_validator or PhoneValidator()
         self.photo_validator = photo_validator or PhotoValidator()
 
-    async def register(
+    async def register(  # pylint: disable=too-many-arguments,too-many-positional-arguments
         self,
         session: AsyncSession,
         name: str,
@@ -45,6 +49,7 @@ class PatientService:
         file: UploadFile,
         background_tasks: BackgroundTasks,
     ) -> PatientResponse:
+        """Validate, persist, and notify for a new patient registration."""
         logger.info("Validating name for new patient: %s", name)
         self.name_validator.validate(name)
 
@@ -80,16 +85,18 @@ class PatientService:
         return response
 
     async def get_all(self, session: AsyncSession) -> list[PatientResponse]:
+        """Return all patients ordered by registration date."""
         logger.info("Fetching all patients from DB")
         patients = await self.repo.get_all(session)
         logger.info("Fetched %d patient(s)", len(patients))
         return [PatientResponse.model_validate(p) for p in patients]
 
-    async def get_by_id(self, session: AsyncSession, id: uuid.UUID) -> PatientResponse:
-        logger.info("Fetching patient from DB: id=%s", id)
-        patient = await self.repo.get_by_id(session, id)
+    async def get_by_id(self, session: AsyncSession, patient_id: uuid.UUID) -> PatientResponse:
+        """Return a single patient by UUID, or raise 404 if not found."""
+        logger.info("Fetching patient from DB: id=%s", patient_id)
+        patient = await self.repo.get_by_id(session, patient_id)
         if patient is None:
-            logger.warning("Patient not found: id=%s", id)
+            logger.warning("Patient not found: id=%s", patient_id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Patient not found.",

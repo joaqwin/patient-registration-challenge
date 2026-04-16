@@ -1,3 +1,5 @@
+"""Dependency providers for the FastAPI application."""
+
 from collections.abc import AsyncIterator
 
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -8,7 +10,7 @@ from src.notifiers.email_notifier import EmailNotifier
 
 engine = create_async_engine(settings.DATABASE_URL, future=True)
 
-AsyncSessionLocal = async_sessionmaker(
+async_session_local = async_sessionmaker(
     engine,
     class_=AsyncSession,
     expire_on_commit=False,
@@ -16,9 +18,11 @@ AsyncSessionLocal = async_sessionmaker(
 
 
 async def get_session() -> AsyncIterator[AsyncSession]:
-    async with AsyncSessionLocal() as session:
+    """Yield a database session for request-scoped dependencies."""
+    async with async_session_local() as session:
         yield session
 
 
 def get_notifiers() -> list[BaseNotifier]:
+    """Return the notifiers used after a patient is registered."""
     return [EmailNotifier()]

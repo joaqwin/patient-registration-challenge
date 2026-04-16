@@ -1,3 +1,5 @@
+"""Validator for patient phone number format and uniqueness."""
+
 import logging
 import re
 
@@ -12,7 +14,7 @@ logger = logging.getLogger(__name__)
 _PHONE_RE = re.compile(r"^\+1\d{10}$")
 
 
-class PhoneValidator:
+class PhoneValidator:  # pylint: disable=too-few-public-methods
     """
     Validates a patient's phone number.
 
@@ -27,6 +29,7 @@ class PhoneValidator:
         session: AsyncSession,
         repo: PatientRepository,
     ) -> None:
+        """Run all phone checks; raises HTTPException on the first failure."""
         self._check_format(phone)
         await self._check_unique(phone, session, repo)
 
@@ -56,5 +59,8 @@ class PhoneValidator:
             logger.warning("Phone already registered: %s", phone)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail=f"The phone number '{phone}' is already registered. Please use a different number.",
+                detail=(
+                    f"The phone number '{phone}' is already registered. "
+                    "Please use a different number."
+                ),
             )

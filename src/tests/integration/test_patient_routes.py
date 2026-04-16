@@ -1,4 +1,5 @@
-import pytest
+"""Integration tests for the POST /patients endpoint."""
+
 from httpx import AsyncClient
 
 VALID_FORM = {
@@ -10,6 +11,7 @@ VALID_FILE = {"document_photo": ("photo.jpg", b"fake-image-data", "image/jpeg")}
 
 
 async def test_post_patient_success(client: AsyncClient) -> None:
+    """A valid multipart request returns 201 with the created patient data."""
     response = await client.post("/patients", data=VALID_FORM, files=VALID_FILE)
 
     assert response.status_code == 201
@@ -23,6 +25,7 @@ async def test_post_patient_success(client: AsyncClient) -> None:
 
 
 async def test_post_patient_duplicate_email(client: AsyncClient) -> None:
+    """Registering the same email twice returns 409 Conflict."""
     await client.post("/patients", data=VALID_FORM, files=VALID_FILE)
 
     response = await client.post("/patients", data=VALID_FORM, files=VALID_FILE)
@@ -31,6 +34,7 @@ async def test_post_patient_duplicate_email(client: AsyncClient) -> None:
 
 
 async def test_post_patient_missing_fields(client: AsyncClient) -> None:
+    """A request missing required form fields returns 422 Unprocessable Entity."""
     response = await client.post(
         "/patients",
         data={"name": "John Doe"},
@@ -41,6 +45,7 @@ async def test_post_patient_missing_fields(client: AsyncClient) -> None:
 
 
 async def test_post_patient_invalid_email(client: AsyncClient) -> None:
+    """A request with a malformed email address returns 422 Unprocessable Entity."""
     response = await client.post(
         "/patients",
         data={**VALID_FORM, "email": "not-an-email"},

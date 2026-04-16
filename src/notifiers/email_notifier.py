@@ -1,7 +1,9 @@
+"""Email notifier — sends a confirmation email via Mailtrap SMTP."""
+
 import logging
+from email.mime.text import MIMEText
 
 import aiosmtplib
-from email.mime.text import MIMEText
 
 from src.core.config import settings
 from src.models.domain import PatientResponse
@@ -10,8 +12,11 @@ from src.notifiers.base import BaseNotifier
 logger = logging.getLogger(__name__)
 
 
-class EmailNotifier(BaseNotifier):
+class EmailNotifier(BaseNotifier):  # pylint: disable=too-few-public-methods
+    """Sends a plain-text registration confirmation email through Mailtrap."""
+
     async def notify(self, patient: PatientResponse) -> None:
+        """Send a confirmation email to the newly registered patient."""
         message = MIMEText(
             f"Hi {patient.name},\n\n"
             "Your registration has been confirmed.\n\n"
@@ -29,8 +34,9 @@ class EmailNotifier(BaseNotifier):
                 hostname=settings.MAILTRAP_HOST,
                 port=settings.MAILTRAP_PORT,
                 username=settings.MAILTRAP_USER,
-                password=settings.MAILTRAP_PASS
+                password=settings.MAILTRAP_PASS,
+                start_tls=True,
             )
             logger.info("Confirmation email sent to %s", patient.email)
-        except Exception:
+        except (aiosmtplib.SMTPException, OSError):
             logger.exception("Failed to send confirmation email to %s", patient.email)
