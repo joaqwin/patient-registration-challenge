@@ -1,22 +1,26 @@
 import uuid
 
-from fastapi import APIRouter, Depends, File, Form, UploadFile, status
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.dependencies import get_session
+from src.core.dependencies import get_notifiers, get_session
 from src.models.domain import PatientCreate, PatientResponse
+from src.notifiers.base import BaseNotifier
 from src.repositories.patient_repository import PatientRepository
 from src.services.patient_service import PatientService
 
 router = APIRouter(prefix="/patients", tags=["patients"])
 
 
-def get_patient_service() -> PatientService:
-    return PatientService(repo=PatientRepository(), notifiers=[])
+def get_patient_service(
+    notifiers: list[BaseNotifier] = Depends(get_notifiers),
+) -> PatientService:
+    return PatientService(repo=PatientRepository(), notifiers=notifiers)
 
 
 @router.post("", response_model=PatientResponse, status_code=status.HTTP_201_CREATED)
 async def create_patient(
+    background_tasks: BackgroundTasks,
     name: str = Form(..., min_length=2),
     email: str = Form(...),
     phone: str = Form(...),
@@ -31,6 +35,7 @@ async def create_patient(
         email=payload.email,
         phone=payload.phone,
         file=document_photo,
+        background_tasks=background_tasks,
     )
 
 

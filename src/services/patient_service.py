@@ -2,19 +2,20 @@ import uuid
 from pathlib import Path
 
 import aiofiles
-from fastapi import HTTPException, UploadFile, status
+from fastapi import BackgroundTasks, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.models.domain import PatientResponse
+from src.notifiers.base import BaseNotifier
 from src.repositories.patient_repository import PatientRepository
 
 UPLOAD_DIR = Path("uploads")
 
 
 class PatientService:
-    def __init__(self, repo: PatientRepository, notifiers: list | None = None):
+    def __init__(self, repo: PatientRepository, notifiers: list[BaseNotifier]):
         self.repo = repo
-        self.notifiers = notifiers if notifiers is not None else []
+        self.notifiers = notifiers
 
     async def register(
         self,
@@ -23,6 +24,7 @@ class PatientService:
         email: str,
         phone: str,
         file: UploadFile,
+        background_tasks: BackgroundTasks,
     ) -> PatientResponse:
         existing = await self.repo.get_by_email(session, email)
         if existing is not None:
@@ -42,7 +44,13 @@ class PatientService:
                 "document_photo": str(file_path),
             },
         )
-        return PatientResponse.model_validate(patient)
+
+        response = PatientResponse.model_validate(patient)
+
+        for notifier in self.notifiers:
+            background_tasks.add_task(notifier.notify, response)
+
+        return response
 
     async def get_all(self, session: AsyncSession) -> list[PatientResponse]:
         patients = await self.repo.get_all(session)
