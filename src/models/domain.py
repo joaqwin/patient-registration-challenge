@@ -1,3 +1,5 @@
+"""Pydantic schemas for request input and API responses."""
+
 import uuid
 from datetime import datetime
 
@@ -13,6 +15,8 @@ class PatientCreate(BaseModel):
 
 
 class PatientResponse(BaseModel):
+    """API response schema for a patient record."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: uuid.UUID

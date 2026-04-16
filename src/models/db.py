@@ -1,17 +1,20 @@
+"""SQLAlchemy ORM models."""
+
 import uuid
 from datetime import datetime
 
-from sqlalchemy import DateTime, String
+from sqlalchemy import DateTime, String, text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
-from sqlalchemy.sql import func
 
 
-class Base(DeclarativeBase):
-    pass
+class Base(DeclarativeBase):  # pylint: disable=too-few-public-methods
+    """Declarative base for all ORM models."""
 
 
-class Patient(Base):
+class Patient(Base):  # pylint: disable=too-few-public-methods
+    """ORM model representing a registered patient."""
+
     __tablename__ = "patients"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -25,6 +28,6 @@ class Patient(Base):
     document_photo: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
+        server_default=text("now()"),
         nullable=False,
     )

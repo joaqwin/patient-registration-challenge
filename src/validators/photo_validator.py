@@ -1,3 +1,5 @@
+"""Validator for patient document photo file type."""
+
 import logging
 from pathlib import Path
 
@@ -9,7 +11,7 @@ ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".webp"}
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/webp"}
 
 
-class PhotoValidator:
+class PhotoValidator:  # pylint: disable=too-few-public-methods
     """
     Validates a patient's document photo upload.
 
@@ -19,6 +21,7 @@ class PhotoValidator:
     """
 
     def validate(self, file: UploadFile) -> None:
+        """Run all photo checks; raises HTTPException on the first failure."""
         self._check_extension(file)
         self._check_content_type(file)
 

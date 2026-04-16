@@ -1,9 +1,11 @@
+"""Abstract base class for the patient notification system (Observer pattern)."""
+
 from abc import ABC, abstractmethod
 
 from src.models.domain import PatientResponse
 
 
-class BaseNotifier(ABC):
+class BaseNotifier(ABC):  # pylint: disable=too-few-public-methods
     """
     Observer base class for the patient notification system.
 

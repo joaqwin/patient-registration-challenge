@@ -1,3 +1,5 @@
+"""Validator for patient name format."""
+
 import logging
 import re
 
@@ -14,7 +16,7 @@ MIN_LENGTH = 2
 MAX_LENGTH = 100
 
 
-class NameValidator:
+class NameValidator:  # pylint: disable=too-few-public-methods
     """
     Validates a patient's name.
 
@@ -27,6 +29,7 @@ class NameValidator:
     """
 
     def validate(self, name: str) -> None:
+        """Run all name checks; raises HTTPException on the first failure."""
         self._check_length(name)
         self._check_no_digits(name)
         self._check_valid_chars(name)

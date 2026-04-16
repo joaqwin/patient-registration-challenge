@@ -1,11 +1,15 @@
+"""Shared pytest fixtures and test infrastructure for the patient API test suite."""
+
 import os
 from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from httpx import ASGITransport, AsyncClient
-from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import NullPool
+from alembic import command
+from alembic.config import Config
 
 from main import app
 from src.core.dependencies import get_notifiers, get_session
@@ -17,14 +21,14 @@ TEST_DATABASE_URL = os.getenv(
 )
 
 test_engine = create_async_engine(TEST_DATABASE_URL, future=True, poolclass=NullPool)
-TestSessionLocal = async_sessionmaker(
+TEST_SESSION_LOCAL = async_sessionmaker(
     test_engine,
     class_=AsyncSession,
     expire_on_commit=False,
 )
 
 
-class _NoOpNotifier(BaseNotifier):
+class _NoOpNotifier(BaseNotifier):  # pylint: disable=too-few-public-methods
     async def notify(self, patient) -> None:
         pass
 
@@ -34,16 +38,16 @@ def _get_test_notifiers() -> list[BaseNotifier]:
 
 
 async def _get_test_session() -> AsyncIterator[AsyncSession]:
-    async with TestSessionLocal() as session:
+    async with TEST_SESSION_LOCAL() as session:
         yield session
 
 
 @pytest.fixture(scope="session")
 def apply_migrations() -> None:
     """Run alembic upgrade head against the test database once per test session.
-    Not autouse — only pulled in by integration tests via their conftest."""
-    from alembic import command
-    from alembic.config import Config
+
+    Not autouse — only pulled in by integration tests via their conftest.
+    """
 
     def _run() -> None:
         cfg = Config("alembic.ini")
@@ -56,6 +60,7 @@ def apply_migrations() -> None:
 
 @pytest.fixture
 async def client() -> AsyncIterator[AsyncClient]:
+    """Yield an AsyncClient wired to the test app with overridden session and notifiers."""
     app.dependency_overrides[get_session] = _get_test_session
     app.dependency_overrides[get_notifiers] = _get_test_notifiers
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
