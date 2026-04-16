@@ -1,7 +1,10 @@
+import logging
 import uuid
 from pathlib import Path
 
 import aiofiles
+
+logger = logging.getLogger(__name__)
 from fastapi import BackgroundTasks, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -36,11 +39,16 @@ class PatientService:
         file: UploadFile,
         background_tasks: BackgroundTasks,
     ) -> PatientResponse:
+        logger.info("Validating email for new patient: %s", email)
         await self.email_validator.validate(email, session, self.repo)
+
+        logger.info("Validating phone for new patient: %s", phone)
         await self.phone_validator.validate(phone, session, self.repo)
 
+        logger.info("Saving document photo for patient: %s", email)
         file_path = await self._save_upload(file)
 
+        logger.info("Creating patient record in DB: %s", email)
         patient = await self.repo.create(
             session,
             {
@@ -52,6 +60,7 @@ class PatientService:
         )
 
         response = PatientResponse.model_validate(patient)
+        logger.info("Patient registered successfully: id=%s email=%s", response.id, response.email)
 
         for notifier in self.notifiers:
             background_tasks.add_task(notifier.notify, response)
@@ -59,12 +68,16 @@ class PatientService:
         return response
 
     async def get_all(self, session: AsyncSession) -> list[PatientResponse]:
+        logger.info("Fetching all patients from DB")
         patients = await self.repo.get_all(session)
+        logger.info("Fetched %d patient(s)", len(patients))
         return [PatientResponse.model_validate(p) for p in patients]
 
     async def get_by_id(self, session: AsyncSession, id: uuid.UUID) -> PatientResponse:
+        logger.info("Fetching patient from DB: id=%s", id)
         patient = await self.repo.get_by_id(session, id)
         if patient is None:
+            logger.warning("Patient not found: id=%s", id)
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Patient not found.",

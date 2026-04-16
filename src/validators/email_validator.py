@@ -1,6 +1,9 @@
+import logging
 import re
 
 from fastapi import HTTPException, status
+
+logger = logging.getLogger(__name__)
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.repositories.patient_repository import PatientRepository
@@ -29,7 +32,9 @@ class EmailValidator:
 
     @staticmethod
     def _check_format(email: str) -> None:
+        logger.info("Checking email format: %s", email)
         if not _EMAIL_RE.match(email):
+            logger.warning("Invalid email format: %s", email)
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail="Invalid email address. Please provide a valid format (e.g. user@example.com).",
@@ -41,8 +46,10 @@ class EmailValidator:
         session: AsyncSession,
         repo: PatientRepository,
     ) -> None:
+        logger.info("Checking email uniqueness: %s", email)
         existing = await repo.get_by_email(session, email)
         if existing is not None:
+            logger.warning("Email already registered: %s", email)
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail=f"The email '{email}' is already registered. Please use a different email address.",
