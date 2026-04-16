@@ -12,7 +12,9 @@ from src.models.domain import PatientResponse
 from src.notifiers.base import BaseNotifier
 from src.repositories.patient_repository import PatientRepository
 from src.validators.email_validator import EmailValidator
+from src.validators.name_validator import NameValidator
 from src.validators.phone_validator import PhoneValidator
+from src.validators.photo_validator import PhotoValidator
 
 UPLOAD_DIR = Path("uploads")
 
@@ -22,13 +24,17 @@ class PatientService:
         self,
         repo: PatientRepository,
         notifiers: list[BaseNotifier],
+        name_validator: NameValidator | None = None,
         email_validator: EmailValidator | None = None,
         phone_validator: PhoneValidator | None = None,
+        photo_validator: PhotoValidator | None = None,
     ):
         self.repo = repo
         self.notifiers = notifiers
+        self.name_validator = name_validator or NameValidator()
         self.email_validator = email_validator or EmailValidator()
         self.phone_validator = phone_validator or PhoneValidator()
+        self.photo_validator = photo_validator or PhotoValidator()
 
     async def register(
         self,
@@ -39,11 +45,17 @@ class PatientService:
         file: UploadFile,
         background_tasks: BackgroundTasks,
     ) -> PatientResponse:
+        logger.info("Validating name for new patient: %s", name)
+        self.name_validator.validate(name)
+
         logger.info("Validating email for new patient: %s", email)
         await self.email_validator.validate(email, session, self.repo)
 
         logger.info("Validating phone for new patient: %s", phone)
         await self.phone_validator.validate(phone, session, self.repo)
+
+        logger.info("Validating document photo for patient: %s", email)
+        self.photo_validator.validate(file)
 
         logger.info("Saving document photo for patient: %s", email)
         file_path = await self._save_upload(file)

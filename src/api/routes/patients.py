@@ -1,14 +1,13 @@
 import logging
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, UploadFile, status
-
-logger = logging.getLogger(__name__)
-from pydantic import ValidationError
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.core.dependencies import get_notifiers, get_session
-from src.models.domain import PatientCreate, PatientResponse
+from src.models.domain import PatientResponse
+
+logger = logging.getLogger(__name__)
 from src.notifiers.base import BaseNotifier
 from src.repositories.patient_repository import PatientRepository
 from src.services.patient_service import PatientService
@@ -34,17 +33,11 @@ async def create_patient(
 ) -> PatientResponse:
     logger.info("POST /patients - registering patient with email=%s", email)
 
-    try:
-        payload = PatientCreate(name=name, email=email, phone=phone)
-    except ValidationError as exc:
-        logger.warning("POST /patients - validation error for email=%s: %s", email, exc.errors())
-        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=exc.errors())
-
     return await service.register(
         session,
-        name=payload.name,
-        email=payload.email,
-        phone=payload.phone,
+        name=name,
+        email=email,
+        phone=phone,
         file=document_photo,
         background_tasks=background_tasks,
     )
