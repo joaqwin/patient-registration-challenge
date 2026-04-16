@@ -62,43 +62,23 @@ Interactive docs: `http://localhost:8000/docs`
 
 ## Running tests
 
-Tests require a separate `patients_test_db` database. When using Docker Compose the
-database is created automatically on first startup via `scripts/init-test-db.sh`.
-If you are running Postgres locally, create it once:
-
 ```bash
-psql -U patients_user -c "CREATE DATABASE patients_test_db;"
-```
-
-Install dependencies and run the full suite from the project root:
-
-```bash
-pip install -r requirements.txt
-pytest
+docker-compose exec app pytest
 ```
 
 Run only unit or integration tests:
 
 ```bash
-pytest src/tests/unit
-pytest src/tests/integration
+docker-compose exec app pytest src/tests/unit
+docker-compose exec app pytest src/tests/integration
 ```
-
-The `TEST_DATABASE_URL` in `.env` points to `localhost` by default, so run pytest
-from your host machine (not inside the container) while the Postgres container is up.
 
 ---
 
 ## Running the linter
 
 ```bash
-pylint src
-```
-
-To lint a single file:
-
-```bash
-pylint src/services/patient_service.py
+docker-compose exec app pylint src
 ```
 
 ---
